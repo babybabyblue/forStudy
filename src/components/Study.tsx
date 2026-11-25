@@ -13,6 +13,7 @@ import {
   type Grade,
 } from "../lib/srs";
 import { ClozeBody, PlainBody, bodyText } from "./CardBody";
+import { effectiveImportance } from "../lib/plan";
 import { ImportanceChip } from "./common";
 
 export interface QueueItem {
@@ -135,7 +136,7 @@ export function Study({ subject, progress, initialQueue, onUpdate, onExit, fontS
       <article className="card">
         <div className="card-head">
           <div className="chips">
-            <ImportanceChip value={progress.overrides.importance[card.id] ?? card.importance} />
+            <ImportanceChip value={effectiveImportance(card, progress.overrides)} />
             <span className="chip src">{subject.sourceLabels?.[card.source] ?? card.source}</span>
             <span className={`chip lv lv${level}`}>{item.mode === "read" ? "新規・通読" : `Lv${level} ${LEVEL_LABEL[level]}`}</span>
           </div>

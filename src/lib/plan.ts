@@ -25,11 +25,18 @@ export interface CardOverrides {
   suspended: Record<string, boolean>;
 }
 
+/**
+ * 実際に使う重要度。自分で変更した値 > （留意事項なら）対応する基準カードの重要度 > 初期値。
+ * 留意事項は対応する基準カードと同じ重要度にして、基準の直後に続けて学習する。
+ */
 export function effectiveImportance(card: MemoCard, ov: CardOverrides): Importance {
-  return ov.importance[card.id] ?? card.importance;
+  const own = ov.importance[card.id];
+  if (own) return own;
+  if (card.anchor) return ov.importance[card.anchor] ?? card.importance;
+  return card.importance;
 }
 
-/** 学習順（新規カードを出す順番） */
+/** 学習順（新規カードを出す順番）: 重要度順、同じ重要度の中では並び順（基準→対応する留意事項） */
 export function learningOrder(cards: MemoCard[], ov: CardOverrides): MemoCard[] {
   const idx = new Map(cards.map((c, i) => [c.id, i]));
   return cards

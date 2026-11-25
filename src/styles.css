@@ -710,3 +710,10 @@ a {
 .install p {
   margin: 4px 0;
 }
+
+/* 留意事項（テキストの枠囲みに相当） */
+.card-list li.ryuui button {
+  padding-left: 28px;
+  background: color-mix(in srgb, var(--accent) 55%, transparent);
+  border-left: 3px solid var(--primary);
+}

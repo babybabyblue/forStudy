@@ -625,8 +625,35 @@ def check(result, k_body, r_body):
     return ok
 
 
+ORDER_FILE = ROOT / "data" / "card_order.json"
+
+
+def apply_study_order(result):
+    """学習・表示の並び順を適用する。
+    data/card_order.json（カードIDの並び）がある場合、その順に並べ替える。
+    この並びでは、運用上の留意事項の各項目が、対応する基準本文の箇所の直後に置かれている。
+    留意事項カードには直前の基準カード（anchor）を記録し、重要度もその基準カードに合わせる。
+    """
+    if ORDER_FILE.exists():
+        order = json.loads(ORDER_FILE.read_text(encoding="utf-8"))
+        rank = {cid: i for i, cid in enumerate(order)}
+        missing = [c["id"] for c in result if c["id"] not in rank]
+        if missing:
+            print(f"警告: 並び順ファイルに無いカード {len(missing)} 件（末尾に配置）: {missing[:5]}", file=sys.stderr)
+        result.sort(key=lambda c: rank.get(c["id"], len(rank)))
+    anchor = None
+    for c in result:
+        if c["source"] == "kijun":
+            anchor = c
+        elif anchor is not None:
+            c["anchor"] = anchor["id"]
+            c["importance"] = anchor["importance"]
+    return result
+
+
 def main():
     result, k_body, r_body = build()
+    result = apply_study_order(result)
     OUT.parent.mkdir(parents=True, exist_ok=True)
     meta = {
         "name": "不動産鑑定評価基準・運用上の留意事項",

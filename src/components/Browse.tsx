@@ -4,6 +4,7 @@ import { IMPORTANCE_LABEL, IMPORTANCE_ORDER } from "../subjects/types";
 import type { SubjectProgress } from "../lib/storage";
 import { isMastered, LEVEL_LABEL } from "../lib/srs";
 import { formatJa } from "../lib/date";
+import { effectiveImportance } from "../lib/plan";
 import { PlainBody } from "./CardBody";
 import { ImportanceChip } from "./common";
 import type { QueueItem } from "./Study";
@@ -22,28 +23,27 @@ interface Group {
   cards: MemoCard[];
 }
 
-/** 出典・編・章ごとにグループ化（基準の各章のすぐ後に対応する留意事項を並べる） */
-function groupCards(cards: MemoCard[], labels: Record<string, string>): Group[] {
-  const groups = new Map<string, Group>();
+/**
+ * 編・章ごとにグループ化。カードの並び順（基準の各箇所の直後に対応する留意事項）をそのまま保つ。
+ * 留意事項は、直前の基準カード（anchor）が属する章に入れる。
+ */
+function groupCards(cards: MemoCard[]): Group[] {
+  const byId = new Map(cards.map((c) => [c.id, c]));
+  const groups: Group[] = [];
+  const index = new Map<string, Group>();
   for (const c of cards) {
-    const key = `${c.part}|${c.chapter}|${c.source}`;
-    if (!groups.has(key)) {
-      const head = c.title.split(" ＞ ")[0].replace(/（\d+\/\d+）$/, "");
-      const label =
-        c.source === "kijun"
-          ? `${c.part} ${head}`
-          : `${labels[c.source] ?? c.source}：${c.part}${c.chapter}`;
-      groups.set(key, { key, label, cards: [] });
+    const base = c.anchor ? byId.get(c.anchor) ?? c : c;
+    const key = `${base.part}|${base.chapter}`;
+    let g = index.get(key);
+    if (!g) {
+      const head = base.title.split(" ＞ ")[0].replace(/（\d+\/\d+）$/, "");
+      g = { key, label: `${base.part} ${head}`, cards: [] };
+      index.set(key, g);
+      groups.push(g);
     }
-    groups.get(key)!.cards.push(c);
+    g.cards.push(c);
   }
-  const partOrder = (p: string) => (p === "総論" ? 0 : 1);
-  const chapNo = (ch: string) => Number(ch.replace(/\D/g, "")) || 0;
-  return [...groups.values()].sort((a, b) => {
-    const [pa, ca, sa] = a.key.split("|");
-    const [pb, cb, sb] = b.key.split("|");
-    return partOrder(pa) - partOrder(pb) || chapNo(ca) - chapNo(cb) || (sa === "kijun" ? 0 : 1) - (sb === "kijun" ? 0 : 1);
-  });
+  return groups;
 }
 
 function status(sp: SubjectProgress, id: string) {
@@ -59,9 +59,9 @@ export function Browse({ subject, progress: sp, onUpdate, onStart, fontSize }: P
   const [impFilter, setImpFilter] = useState<Importance | "">("");
   const [open, setOpen] = useState<Record<string, boolean>>({});
   const [detail, setDetail] = useState<MemoCard | null>(null);
-  const groups = useMemo(() => groupCards(subject.cards, subject.sourceLabels ?? {}), [subject]);
+  const groups = useMemo(() => groupCards(subject.cards), [subject]);
 
-  const imp = (c: MemoCard) => sp.overrides.importance[c.id] ?? c.importance;
+  const imp = (c: MemoCard) => effectiveImportance(c, sp.overrides);
   const matches = (c: MemoCard) =>
     (!impFilter || imp(c) === impFilter) &&
     (!query || c.title.includes(query) || c.body.some((p) => !p.startsWith("[[FIG]]") && p.includes(query)));
@@ -172,9 +172,10 @@ export function Browse({ subject, progress: sp, onUpdate, onStart, fontSize }: P
                 {list.map((c) => {
                   const st = status(sp, c.id);
                   return (
-                    <li key={c.id}>
+                    <li key={c.id} className={c.source === "ryuui" ? "ryuui" : ""}>
                       <button onClick={() => setDetail(c)}>
                         <ImportanceChip value={imp(c)} />
+                        {c.source === "ryuui" && <span className="chip src">留意</span>}
                         <span className="cl-title">{c.title.split(" ＞ ").slice(1).join(" ＞ ") || `（${c.title.replace(/（\d+\/\d+）$/, "")} の前文）`}</span>
                         <span className={`chip ${st.cls}`}>{st.label}</span>
                       </button>

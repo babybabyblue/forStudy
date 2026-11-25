@@ -15,6 +15,21 @@ describe("content", () => {
     expect(cards.length).toBeGreaterThan(250);
     expect(new Set(cards.map((c) => c.id)).size).toBe(cards.length);
   });
+  it("留意事項は、学習順で対応する基準カードの直後（他の留意事項の後ろ）に続く", () => {
+    const order = learningOrder(cards, ov);
+    let lastKijun = "";
+    for (const c of order) {
+      if (c.source === "kijun") lastKijun = c.id;
+      else expect(c.anchor).toBe(lastKijun);
+    }
+  });
+  it("基準カードの重要度を変えると、対応する留意事項も連動する", () => {
+    const r = cards.find((c) => c.anchor)!;
+    const o: CardOverrides = { importance: { [r.anchor!]: "C" }, suspended: {} };
+    const order = learningOrder(cards, o);
+    const i = order.findIndex((c) => c.id === r.anchor);
+    expect(order[i + 1].anchor).toBe(r.anchor);
+  });
   it("重要度順: S が先頭、C が末尾", () => {
     const order = learningOrder(cards, ov);
     expect(order[0].importance).toBe("S");
