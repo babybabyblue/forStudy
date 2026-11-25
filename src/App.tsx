@@ -75,7 +75,7 @@ export function App() {
         {(
           [
             ["home", "🏠", "ホーム"],
-            ["browse", "📖", "一覧・本文"],
+            ["browse", "📖", "目次"],
             ["settings", "⚙️", "設定"],
           ] as [Tab, string, string][]
         ).map(([t, icon, label]) => (

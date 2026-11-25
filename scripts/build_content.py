@@ -626,6 +626,56 @@ def check(result, k_body, r_body):
 
 
 ORDER_FILE = ROOT / "data" / "card_order.json"
+KEY_TERMS_FILE = ROOT / "data" / "key_terms.txt"
+
+# 自動抽出から外す語（一般的すぎる・文の一部を誤って拾うもの）
+AUTO_TERM_STOP = {
+    "不動産", "鑑定評価", "価格", "賃料", "土地", "建物", "これ", "それ", "同法", "当該不動産",
+    "依頼者", "建物等", "法令等", "提出先等", "不動産鑑定士", "不動産の鑑定評価", "取引事例等",
+    "投資法人等", "支払賃料等", "特殊な事情", "相当の期間", "宅地", "農地", "林地",
+}
+
+
+def extract_key_terms(result) -> list[str]:
+    """重要単語: data/key_terms.txt の一覧 ＋ 本文中で定義されている語（自動抽出）。
+    本文に出てくるものだけを、長い順に返す（長い語を優先して照合するため）。"""
+    texts = [b for c in result for b in c["body"] if not b.startswith("[[FIG]]")]
+    alltext = "\n".join(texts)
+    terms: set[str] = set()
+    if KEY_TERMS_FILE.exists():
+        for line in KEY_TERMS_FILE.read_text(encoding="utf-8").splitlines():
+            t = line.split("#", 1)[0].strip()
+            if t:
+                terms.add(t)
+    auto: set[str] = set()
+    for t in texts:
+        # 「〇〇」という / 以下「〇〇」という
+        for m in re.finditer(r"「([^「」、。]{2,16})」という", t):
+            auto.add(m.group(1))
+        # 〇〇を△△という（この手法による試算価格を積算価格という。）
+        for m in re.finditer(r"を([^、。（）「」をのはが]{2,12})という", t):
+            auto.add(m.group(1))
+        # 段落頭の「〇〇とは、」
+        m = re.match(r"^(?:（[^）]{1,3}）|[①-⑳])?([^、。（）「」]{2,16})とは、", t)
+        if m:
+            auto.add(m.group(1))
+    # 箇条記号（「イ実現性」の「イ」）を外し、動詞・一般語を除く
+    auto = {re.sub(r"^[ア-ン](?=[一-龥])", "", a) for a in auto}
+    auto = {
+        a
+        for a in auto
+        if a not in AUTO_TERM_STOP
+        and not re.search(r"[0-9０-９]", a)
+        and not re.search(r"(る|す|う|く|つ|する)$", a)
+        and len(a) >= 2
+    }
+    terms |= auto
+    found = sorted((t for t in terms if t in alltext), key=lambda x: (-len(x), x))
+    print(f"重要単語: {len(found)} 語（一覧 {len(terms - auto)}・自動抽出 {len(auto)}）", file=sys.stderr)
+    if "--terms" in sys.argv:
+        print("  自動抽出:", "、".join(sorted(auto)), file=sys.stderr)
+        print("  本文に無い語:", "、".join(sorted(t for t in terms if t not in alltext)), file=sys.stderr)
+    return found
 
 
 def apply_study_order(result):
@@ -664,7 +714,7 @@ def main():
         },
     }
     OUT.write_text(
-        json.dumps({"meta": meta, "cards": result}, ensure_ascii=False, indent=1) + "\n",
+        json.dumps({"meta": meta, "keyTerms": extract_key_terms(result), "cards": result}, ensure_ascii=False, indent=1) + "\n",
         encoding="utf-8",
     )
     print(f"cards: {len(result)}", file=sys.stderr)

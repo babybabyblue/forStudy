@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import kijun from "../data/kijun.json";
 import type { MemoCard } from "../subjects/types";
-import { chooseHidden, splitChunks } from "./cloze";
+import { chooseHidden, compileTerms, hideAllTerms, splitChunks, termSpans } from "./cloze";
 import { addDays, addMonths, diffDays } from "./date";
 import { diffText } from "./diff";
 import { dailyQuota, dueCards, introDeadline, learningOrder, type CardOverrides } from "./plan";
@@ -38,16 +38,32 @@ describe("content", () => {
 });
 
 describe("cloze", () => {
-  it("分割しても文が欠けない", () => {
+  const re = compileTerms(kijun.keyTerms);
+  it("重要単語がある", () => {
+    expect(kijun.keyTerms.length).toBeGreaterThan(150);
+    expect(kijun.keyTerms).toContain("最有効使用");
+    expect(kijun.keyTerms).toContain("相対的稀少性");
+  });
+  it("分割しても文が欠けず、重要単語は途中で切れない", () => {
     for (const c of cards) {
       for (const p of c.body) {
         if (p.startsWith("[[FIG]]")) continue;
-        expect(splitChunks(p).map((x) => x.text).join("")).toBe(p);
+        const chunks = splitChunks(p, re);
+        expect(chunks.map((x) => x.text).join("")).toBe(p);
+        expect(chunks.map((x) => x.segs.map((g) => g.text).join("")).join("")).toBe(p);
+        // 重要単語の出現箇所の数 = 単語セグメントの数（途中で分割されていない）
+        const nTerms = termSpans(p, re).length;
+        const nSegs = chunks.flatMap((x) => x.segs).filter((g) => g.term).length;
+        expect(nSegs).toBe(nTerms);
       }
     }
   });
-  it("レベルに応じて隠す割合が増える", () => {
-    const chunks = splitChunks(cards[1].body.join(""));
+  it("穴埋めの段階では重要単語を毎回すべて隠し、ほかの句もレベルに応じて増やす", () => {
+    expect(hideAllTerms(0)).toBe(false);
+    expect(hideAllTerms(1)).toBe(true);
+    const p = cards[2].body.join("");
+    const chunks = splitChunks(p, re);
+    expect(chunks.some((c) => c.hasTerm)).toBe(true);
     const count = (lv: number) => chooseHidden(chunks, lv, "x").filter(Boolean).length;
     expect(count(0)).toBe(0);
     expect(count(1)).toBeLessThan(count(2));

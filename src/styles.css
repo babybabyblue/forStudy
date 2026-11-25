@@ -717,3 +717,51 @@ a {
   background: color-mix(in srgb, var(--accent) 55%, transparent);
   border-left: 3px solid var(--primary);
 }
+
+/* 重要単語 */
+.term {
+  font-weight: 700;
+  text-decoration: underline;
+  text-decoration-color: color-mix(in srgb, var(--primary) 60%, transparent);
+  text-underline-offset: 3px;
+}
+.blank.term-blank {
+  background: color-mix(in srgb, var(--primary) 35%, var(--blank));
+}
+
+/* 目次 */
+.part-title {
+  font-size: 14px;
+  color: var(--muted);
+  margin: 16px 4px 8px;
+}
+.toc-head {
+  align-items: center;
+}
+.toc-main {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+.toc-progress {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.toc-nums {
+  font-size: 11px;
+}
+.sec-list li button {
+  align-items: center;
+  padding: 10px 16px 10px 24px;
+}
+.sec-title {
+  font-size: 18px;
+  margin: 2px 0 8px;
+}
+.row-btns.spread {
+  justify-content: space-between;
+  align-items: center;
+}

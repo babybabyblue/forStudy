@@ -14,11 +14,13 @@ import {
 } from "../lib/srs";
 import { ClozeBody, PlainBody, bodyText } from "./CardBody";
 import { effectiveImportance } from "../lib/plan";
+import { compileTerms } from "../lib/cloze";
 import { ImportanceChip } from "./common";
 
 export interface QueueItem {
   id: string;
-  mode: "read" | "recall";
+  /** read: 新規の通読 / recall: 復習（記録を更新） / practice: 練習（記録を更新しない） */
+  mode: "read" | "recall" | "practice";
 }
 
 interface Props {
@@ -44,6 +46,7 @@ export function Study({ subject, progress, initialQueue, onUpdate, onExit, fontS
   const [done, setDone] = useState(0);
   const startedAt = useRef(Date.now());
   const cardMap = useMemo(() => new Map(subject.cards.map((c) => [c.id, c])), [subject]);
+  const termsRe = useMemo(() => compileTerms(subject.keyTerms), [subject]);
   const day = today();
 
   const item = queue[0];
@@ -104,6 +107,20 @@ export function Study({ subject, progress, initialQueue, onUpdate, onExit, fontS
   };
 
   const grade = (g: Grade) => {
+    if (item.mode === "practice") {
+      // 練習: 間隔反復の記録は変えない（復習日前に採点すると定着の判定が甘くなるため）
+      onUpdate((s) => logTime(s, false, false));
+      setQueue((q) => {
+        const rest = q.slice(1);
+        if (g === 0) {
+          const pos = Math.min(rest.length, 4);
+          return [...rest.slice(0, pos), { id: card.id, mode: "practice" }, ...rest.slice(pos)];
+        }
+        return rest;
+      });
+      setDone((d) => d + 1);
+      return;
+    }
     const cur = progress.cards[card.id] ?? afterFirstRead(newCardState(day), day);
     const next = review(cur, g, day);
     onUpdate((s) => logTime({ ...s, cards: { ...s.cards, [card.id]: next } }, false, true));
@@ -139,19 +156,20 @@ export function Study({ subject, progress, initialQueue, onUpdate, onExit, fontS
             <ImportanceChip value={effectiveImportance(card, progress.overrides)} />
             <span className="chip src">{subject.sourceLabels?.[card.source] ?? card.source}</span>
             <span className={`chip lv lv${level}`}>{item.mode === "read" ? "新規・通読" : `Lv${level} ${LEVEL_LABEL[level]}`}</span>
+            {item.mode === "practice" && <span className="chip">練習（記録なし）</span>}
           </div>
           <h2 className="card-title">{card.title}</h2>
         </div>
 
         {item.mode === "read" ? (
           <>
-            <p className="hint">まずは全文を読もう。できれば声に出して2回。次に穴埋めで確認するで。</p>
-            <PlainBody body={card.body} />
+            <p className="hint">まずは全文を読もう。できれば声に出して2回。<strong className="term">太字</strong>の重要単語は、穴埋めで毎回必ず穴になるで。</p>
+            <PlainBody body={card.body} termsRe={termsRe} />
           </>
         ) : (
           <>
             <p className="hint">
-              {level <= 2 && "空欄を思い出してから、タップで1つずつ確認。"}
+              {level <= 2 && "重要単語はすべて穴。空欄を思い出して（できれば声に出して）から、タップで1つずつ確認。"}
               {level === 3 && "各句の頭文字だけがヒント。全文を思い出そう。"}
               {level >= 4 && "見出しだけで全文を再現しよう。"}
             </p>
@@ -186,7 +204,7 @@ export function Study({ subject, progress, initialQueue, onUpdate, onExit, fontS
                 </p>
               </div>
             ) : (
-              <ClozeBody key={`${seed}:${level}:${done}`} body={card.body} level={level} seed={seed} revealAll={revealed} />
+              <ClozeBody key={`${seed}:${level}:${done}`} body={card.body} level={level} seed={seed} revealAll={revealed} termsRe={termsRe} />
             )}
           </>
         )}
@@ -207,7 +225,11 @@ export function Study({ subject, progress, initialQueue, onUpdate, onExit, fontS
               <button key={g} className={`btn grade g${g}`} onClick={() => grade(g)}>
                 <span>{GRADE_LABEL[g]}</span>
                 <small>
-                  {fmtInterval(previewInterval(state ?? afterFirstRead(newCardState(day), day), g, day))}
+                  {item.mode === "practice"
+                    ? g === 0
+                      ? "もう一回"
+                      : "次へ"
+                    : fmtInterval(previewInterval(state ?? afterFirstRead(newCardState(day), day), g, day))}
                 </small>
               </button>
             ))}
