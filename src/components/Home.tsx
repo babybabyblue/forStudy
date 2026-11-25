@@ -1,7 +1,7 @@
 import type { MemoSubject } from "../subjects/types";
 import { IMPORTANCE_LABEL, IMPORTANCE_ORDER } from "../subjects/types";
 import type { PlanSettings } from "../lib/plan";
-import { dailyQuota, dueCards, introDeadline, nextNewCards, progress } from "../lib/plan";
+import { dailyQuota, dueCards, effectiveImportance, introDeadline, nextNewCards, progress } from "../lib/plan";
 import type { SubjectProgress } from "../lib/storage";
 import { addDays, diffDays, formatJa, formatJaLong, today } from "../lib/date";
 import type { QueueItem } from "./Study";
@@ -92,7 +92,7 @@ export function Home({ subject, progress: sp, plan, onStart }: Props) {
           <ul className="next-list">
             {q.newCards.map((c) => (
               <li key={c.id}>
-                <span className={`chip imp imp-${ov.importance[c.id] ?? c.importance}`}>{ov.importance[c.id] ?? c.importance}</span>
+                <span className={`chip imp imp-${effectiveImportance(c, ov)}`}>{effectiveImportance(c, ov)}</span>
                 {c.title}
               </li>
             ))}

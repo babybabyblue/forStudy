@@ -28,6 +28,8 @@ export interface MemoCard {
   /** 段落。"[[FIG]]{json}" は図表（画像）を表す */
   body: string[];
   importance: Importance;
+  /** 留意事項カードの場合、直前に置かれている対応する基準カードのID */
+  anchor?: string;
   /** 本文の文字数（図表を除く） */
   chars: number;
 }
