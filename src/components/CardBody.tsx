@@ -1,5 +1,5 @@
-import { useMemo, useState } from "react";
-import { chooseHidden, hintOf, splitChunks } from "../lib/cloze";
+import { useMemo, useState, type ReactNode } from "react";
+import { chooseHidden, hideAllTerms, hintOf, splitChunks, termSpans } from "../lib/cloze";
 
 const LIST_RE = /^(（[０-９0-9]+）|（[ア-ン]）|[①-⑳]|[ア-ン](?=[^゠-ヿ])|[０-９]+．|[ⅠⅡⅢⅣⅤⅥⅦⅧⅨⅩ]+)/u;
 
@@ -21,8 +21,27 @@ export function Figure({ raw }: { raw: string }) {
   );
 }
 
-/** 全文表示 */
-export function PlainBody({ body }: { body: string[] }) {
+/** 重要単語を強調して表示 */
+function highlightTerms(text: string, termsRe: RegExp | null): ReactNode {
+  const spans = termSpans(text, termsRe);
+  if (!spans.length) return text;
+  const out: ReactNode[] = [];
+  let pos = 0;
+  spans.forEach(([s, e], i) => {
+    if (s > pos) out.push(text.slice(pos, s));
+    out.push(
+      <strong key={i} className="term">
+        {text.slice(s, e)}
+      </strong>,
+    );
+    pos = e;
+  });
+  if (pos < text.length) out.push(text.slice(pos));
+  return out;
+}
+
+/** 全文表示（重要単語は強調） */
+export function PlainBody({ body, termsRe = null }: { body: string[]; termsRe?: RegExp | null }) {
   return (
     <div className="card-body">
       {body.map((p, i) =>
@@ -30,7 +49,7 @@ export function PlainBody({ body }: { body: string[] }) {
           <Figure key={i} raw={p} />
         ) : (
           <p key={i} className={paraClass(p)}>
-            {p}
+            {highlightTerms(p, termsRe)}
           </p>
         ),
       )}
@@ -43,18 +62,36 @@ interface ClozeProps {
   level: number;
   seed: string;
   revealAll: boolean;
+  termsRe: RegExp | null;
+}
+
+function Blank({ text, onOpen, term }: { text: string; onOpen: () => void; term?: boolean }) {
+  const tail = text.match(/[、。，]$/)?.[0] ?? "";
+  const len = Array.from(text).length - tail.length;
+  return (
+    <>
+      <button
+        type="button"
+        className={term ? "blank term-blank" : "blank"}
+        style={{ width: `${Math.max(1.5, len)}em` }}
+        onClick={onOpen}
+        aria-label="タップで表示"
+      />
+      {tail}
+    </>
+  );
 }
 
 /** 穴埋め表示（レベルに応じて隠す） */
-export function ClozeBody({ body, level, seed, revealAll }: ClozeProps) {
+export function ClozeBody({ body, level, seed, revealAll, termsRe }: ClozeProps) {
   const paras = useMemo(
     () =>
       body.map((p, pi) => {
         if (p.startsWith("[[FIG]]")) return { fig: p, chunks: [], hidden: [] };
-        const chunks = splitChunks(p);
+        const chunks = splitChunks(p, termsRe);
         return { fig: null, chunks, hidden: chooseHidden(chunks, level, `${seed}:${pi}`) };
       }),
-    [body, level, seed],
+    [body, level, seed, termsRe],
   );
   const [opened, setOpened] = useState<Record<string, boolean>>({});
 
@@ -87,28 +124,45 @@ export function ClozeBody({ body, level, seed, revealAll }: ClozeProps) {
           <p key={pi} className={paraClass(body[pi])}>
             {p.chunks.map((c, ci) => {
               const key = `${pi}-${ci}`;
-              if (!p.hidden[ci]) return <span key={key}>{c.text}</span>;
-              const show = revealAll || opened[key];
-              if (show)
+              const open = (k: string) => () => setOpened((o) => ({ ...o, [k]: true }));
+              const revealedCls = (k: string) => (revealAll && !opened[k] ? "revealed" : "revealed self");
+              // 句ごと隠す
+              if (p.hidden[ci]) {
+                if (revealAll || opened[key]) {
+                  return (
+                    <span key={key} className={revealedCls(key)}>
+                      {highlightTerms(c.text, termsRe)}
+                    </span>
+                  );
+                }
+                const { shown, hidden } = level >= 3 ? hintOf(c.text) : { shown: "", hidden: c.text };
                 return (
-                  <span key={key} className={revealAll && !opened[key] ? "revealed" : "revealed self"}>
-                    {c.text}
+                  <span key={key}>
+                    {shown}
+                    <Blank text={hidden} onOpen={open(key)} term={c.hasTerm} />
                   </span>
                 );
-              const { shown, hidden } = level >= 3 ? hintOf(c.text) : { shown: "", hidden: c.text };
-              const tail = hidden.match(/[、。，]$/)?.[0] ?? "";
-              const len = Array.from(hidden).length - tail.length;
+              }
+              // 句は見せるが、重要単語は個別に隠す
               return (
                 <span key={key}>
-                  {shown}
-                  <button
-                    type="button"
-                    className="blank"
-                    style={{ width: `${Math.max(1.5, len)}em` }}
-                    onClick={() => setOpened((o) => ({ ...o, [key]: true }))}
-                    aria-label="タップで表示"
-                  />
-                  {tail}
+                  {c.segs.map((sg, si) => {
+                    const k = `${key}-${si}`;
+                    if (!sg.term) return <span key={k}>{sg.text}</span>;
+                    if (!hideAllTerms(level))
+                      return (
+                        <strong key={k} className="term">
+                          {sg.text}
+                        </strong>
+                      );
+                    if (revealAll || opened[k])
+                      return (
+                        <strong key={k} className={"term " + revealedCls(k)}>
+                          {sg.text}
+                        </strong>
+                      );
+                    return <Blank key={k} text={sg.text} onOpen={open(k)} term />;
+                  })}
                 </span>
               );
             })}

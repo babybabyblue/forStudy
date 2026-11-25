@@ -11,6 +11,7 @@ const kanteiTheory: MemoSubject = {
   sourceUrls: kijun.meta.sourceUrls,
   sourceLabels: { kijun: "基準", ryuui: "留意事項" },
   cards: kijun.cards as MemoCard[],
+  keyTerms: kijun.keyTerms,
 };
 
 /** 行政法規（短答式）。問題データは今後 src/data/gyosei.json として追加予定 */

@@ -66,6 +66,8 @@ interface SubjectBase {
 export interface MemoSubject extends SubjectBase {
   kind: "memo";
   cards: MemoCard[];
+  /** 重要単語（穴埋めで毎回必ず隠す） */
+  keyTerms: string[];
 }
 
 export interface QuizSubject extends SubjectBase {
