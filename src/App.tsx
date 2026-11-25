@@ -8,6 +8,7 @@ import { Study, type QueueItem } from "./components/Study";
 import { Browse } from "./components/Browse";
 import { Settings } from "./components/Settings";
 import { ComingSoon } from "./components/ComingSoon";
+import { InstallHint } from "./components/InstallHint";
 
 type Tab = "home" | "browse" | "settings";
 
@@ -54,6 +55,11 @@ export function App() {
       {saveError && <div className="warn banner">学習記録を保存できませんでした（ブラウザの容量・プライベートモードをご確認ください）。</div>}
 
       <main>
+        {tab === "home" && (
+          <div className="screen-top">
+            <InstallHint />
+          </div>
+        )}
         {tab === "settings" ? (
           <Settings data={data} setData={setData} subjects={SUBJECTS} />
         ) : subject.kind === "quiz" ? (

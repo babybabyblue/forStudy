@@ -6,6 +6,9 @@ import "./styles.css";
 
 registerSW({ immediate: true });
 
+// 学習記録をブラウザの自動削除から守るため、永続ストレージを要求（対応ブラウザのみ）
+navigator.storage?.persist?.().catch(() => undefined);
+
 createRoot(document.getElementById("root")!).render(
   <StrictMode>
     <App />

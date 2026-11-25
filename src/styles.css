@@ -694,3 +694,19 @@ code {
 a {
   color: var(--primary);
 }
+
+.screen-top {
+  padding: 12px 16px 0;
+}
+.screen-top + .screen {
+  padding-top: 0;
+}
+.screen-top:empty {
+  display: none;
+}
+.screen-top:empty + .screen {
+  padding-top: 12px;
+}
+.install p {
+  margin: 4px 0;
+}

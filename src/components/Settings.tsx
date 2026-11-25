@@ -3,6 +3,7 @@ import type { AppData } from "../lib/storage";
 import { defaultData, exportJson, importJson } from "../lib/storage";
 import { addMonths, diffDays, today } from "../lib/date";
 import type { Subject } from "../subjects/types";
+import { InstallHint } from "./InstallHint";
 
 interface Props {
   data: AppData;
@@ -39,6 +40,7 @@ export function Settings({ data, setData, subjects }: Props) {
 
   return (
     <div className="screen">
+      <InstallHint always />
       <section className="panel">
         <h3>学習プラン</h3>
         <label className="field">
